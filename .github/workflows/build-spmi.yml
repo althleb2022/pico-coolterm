@@ -1,0 +1,33 @@
+name: Build RP2040 SPMI UF2
+on:
+  push:
+    paths:
+      - 'spmi/**'
+      - '.github/workflows/build-spmi.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build gcc-arm-none-eabi libnewlib-arm-none-eabi git python3
+      - name: Pico SDK
+        run: |
+          git clone --depth 1 --branch 2.0.0 https://github.com/raspberrypi/pico-sdk.git /tmp/pico-sdk
+          git -C /tmp/pico-sdk submodule update --init --depth 1
+          cp /tmp/pico-sdk/external/pico_sdk_import.cmake spmi/
+      - name: Configure
+        run: cmake -S spmi -B build-spmi -G Ninja -DPICO_SDK_PATH=/tmp/pico-sdk -DPICO_BOARD=pico
+      - name: Build
+        run: cmake --build build-spmi --parallel 2
+      - name: Upload UF2
+        uses: actions/upload-artifact@v4
+        with:
+          name: pico_spmi_sniffer_uf2
+          path: build-spmi/pico_spmi_sniffer.uf2
+          if-no-files-found: error
