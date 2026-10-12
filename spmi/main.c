@@ -6,6 +6,7 @@
 #include "hardware/dma.h"
 #include "hardware/clocks.h"
 #include "hardware/irq.h"
+#include "hardware/sync.h"
 #define CLK 2
 #define DAT 3
 #define RATE 40000000u
