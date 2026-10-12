@@ -1,6 +1,9 @@
-name: Build Pico UF2
+name: Build GusmanB V6 CoolTerm UF2
 on:
   push:
+    paths:
+      - 'coolterm_v6_patch.py'
+      - '.github/workflows/build-uf2.yml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -9,21 +12,37 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - name: Install toolchain
+      - name: Install ARM toolchain
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build gcc-arm-none-eabi libnewlib-arm-none-eabi git python3
-      - name: Get Pico SDK
+      - name: Fetch original GusmanB firmware and SDK
         run: |
-          git clone --depth 1 --branch 1.5.1 https://github.com/raspberrypi/pico-sdk.git /tmp/pico-sdk
+          git clone --depth 1 https://github.com/gusmanb/logicanalyzer.git upstream
+          git clone --depth 1 --branch 2.0.0 https://github.com/raspberrypi/pico-sdk.git /tmp/pico-sdk
           git -C /tmp/pico-sdk submodule update --init --depth 1
+      - name: Patch original V6 only at USB output and auto rearm
+        run: |
+          cp coolterm_v6_patch.py upstream/Firmware/LogicAnalyzer_V2/
+          cd upstream/Firmware/LogicAnalyzer_V2
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("LogicAnalyzer_Build_Settings.cmake")
+          s=p.read_text().replace('set(BOARD_TYPE "BOARD_PICO_2")','set(BOARD_TYPE "BOARD_PICO")').replace('set(TURBO_MODE 1)','set(TURBO_MODE 0)')
+          p.write_text(s)
+          c=Path("CMakeLists.txt")
+          s=c.read_text().replace('include(${USERHOME}/.pico-sdk/cmake/pico-vscode.cmake)','')
+          c.write_text(s)
+          PY
+          cp /tmp/pico-sdk/external/pico_sdk_import.cmake .
+          python3 coolterm_v6_patch.py
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DPICO_BOARD=pico -DPICO_SDK_PATH=/tmp/pico-sdk
+        run: cmake -S upstream/Firmware/LogicAnalyzer_V2 -B build-v6 -G Ninja -DPICO_SDK_PATH=/tmp/pico-sdk -DPICO_BOARD=pico
       - name: Build
-        run: cmake --build build --parallel 2
+        run: cmake --build build-v6 --parallel 2
       - name: Upload UF2
         uses: actions/upload-artifact@v4
         with:
-          name: pico-coolterm-uf2
-          path: build/rp2040-logic-analyzer.uf2
+          name: gusmanb-v6-coolterm-uf2
+          path: build-v6/LogicAnalyzer.uf2
           if-no-files-found: error
