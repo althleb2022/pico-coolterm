@@ -1,0 +1,29 @@
+name: Build Pico UF2
+on:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build gcc-arm-none-eabi libnewlib-arm-none-eabi git python3
+      - name: Get Pico SDK
+        run: |
+          git clone --depth 1 --branch 1.5.1 https://github.com/raspberrypi/pico-sdk.git /tmp/pico-sdk
+          git -C /tmp/pico-sdk submodule update --init --depth 1
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DPICO_BOARD=pico -DPICO_SDK_PATH=/tmp/pico-sdk
+      - name: Build
+        run: cmake --build build --parallel 2
+      - name: Upload UF2
+        uses: actions/upload-artifact@v4
+        with:
+          name: pico-coolterm-uf2
+          path: build/rp2040-logic-analyzer.uf2
+          if-no-files-found: error
